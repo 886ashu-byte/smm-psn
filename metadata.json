@@ -1,0 +1,6 @@
+{
+  "name": "PulseFlow SMM Studio",
+  "description": "Algorithmic SMM child panel with multi-provider routing, anti-detection circadian pacing, and precision engagement distribution for Instagram and TikTok.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
