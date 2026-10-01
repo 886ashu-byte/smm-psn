@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -12,6 +11,31 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
+// Enable CORS for cross-origin deployment (e.g. GitHub Pages frontend talking to Vercel/VPS backend)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Normalize request URL if reverse proxy or Vercel stripped /api prefix
+app.use((req, _res, next) => {
+  if (!req.url.startsWith('/api') && (
+    req.url.startsWith('/smm') ||
+    req.url.startsWith('/cron') ||
+    req.url.startsWith('/scheduler') ||
+    req.url.startsWith('/campaigns') ||
+    req.url.startsWith('/ai')
+  )) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
 // Gemini client initialization
 const apiKey = process.env.GEMINI_API_KEY;
 let aiClient: GoogleGenAI | null = null;
@@ -22,7 +46,7 @@ if (apiKey) {
 // -------------------------------------------------------------
 // Data Persistence Directory
 // -------------------------------------------------------------
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const DATA_DIR = process.env.VERCEL ? path.resolve('/tmp', 'data') : path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(DATA_DIR)) {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -912,13 +936,14 @@ Rules:
 // Vite Middleware / Static Serving
 // -------------------------------------------------------------
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));
     app.get('*', (_req, res) => {
       res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
@@ -931,4 +956,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

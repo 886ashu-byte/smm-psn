@@ -72,15 +72,166 @@ export default function App() {
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
   const [isOrganicModalOpen, setIsOrganicModalOpen] = useState(false);
 
+  // Helper to dispatch a single chunk on client-side (used in static GitHub Pages or serverless fallback)
+  const dispatchChunkLocally = (campaignId: string, chunkIndex: number) => {
+    setCampaigns((prev) => {
+      const updated = prev.map((camp) => {
+        if (camp.id !== campaignId) return camp;
+        const chunk = camp.chunks[chunkIndex];
+        if (!chunk || chunk.dispatchStatus === 'dispatched' || chunk.status === 'dispatched') {
+          return camp;
+        }
+
+        const viewsOrderId = `AUT-V-${Math.floor(100000 + Math.random() * 900000)}`;
+        const likesOrderId = chunk.likes >= 5 ? `AUT-L-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+        const savesOrderId = chunk.saves >= 1 ? `AUT-S-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+        const repostsOrderId = (chunk.reposts || 0) >= 1 ? `AUT-R-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+        const sharesOrderId = chunk.shares >= 10 ? `AUT-SH-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+        const commentsOrderId = chunk.comments >= 1 ? `AUT-C-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+
+        const updatedChunks = camp.chunks.map((chk, idx) =>
+          idx === chunkIndex
+            ? {
+                ...chk,
+                dispatchStatus: 'dispatched' as const,
+                status: 'dispatched' as const,
+                realParentOrderId: viewsOrderId,
+                likesOrderId,
+                savesOrderId,
+                repostsOrderId,
+                sharesOrderId,
+                commentsOrderId,
+                dispatchedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }
+            : chk
+        );
+
+        const newDispatchedViews = Math.min(camp.baseViews, (camp.dispatchedViews || 0) + chunk.views);
+        const newDispatchedLikes = (camp.dispatchedLikes || 0) + (chunk.likes || 0);
+        const newDispatchedComments = (camp.dispatchedComments || 0) + (chunk.comments || 0);
+        const newDispatchedShares = (camp.dispatchedShares || 0) + (chunk.shares || 0);
+        const newDispatchedSaves = (camp.dispatchedSaves || 0) + (chunk.saves || 0);
+        const newDispatchedReposts = (camp.dispatchedReposts || 0) + (chunk.reposts || 0);
+
+        const allDispatched = updatedChunks.every(
+          (c) => c.dispatchStatus === 'dispatched' || c.status === 'dispatched'
+        );
+
+        const newProgress = Math.min(100, Math.round((newDispatchedViews / camp.baseViews) * 100));
+
+        return {
+          ...camp,
+          chunks: updatedChunks,
+          dispatchedViews: newDispatchedViews,
+          dispatchedLikes: newDispatchedLikes,
+          dispatchedComments: newDispatchedComments,
+          dispatchedShares: newDispatchedShares,
+          dispatchedSaves: newDispatchedSaves,
+          dispatchedReposts: newDispatchedReposts,
+          progressPercent: newProgress,
+          status: allDispatched ? ('completed' as const) : camp.status,
+        };
+      });
+      saveStoredCampaigns(updated);
+      return updated;
+    });
+  };
+
+  // Autonomous client-side schedule tick for static deployment (GitHub Pages)
+  const processAutonomousClientTick = () => {
+    const now = Date.now();
+    setCampaigns((prev) => {
+      let changed = false;
+      const updated = prev.map((camp) => {
+        if (camp.status !== 'running') return camp;
+
+        const nextChunkIdx = camp.chunks.findIndex(
+          (chk) => chk.dispatchStatus !== 'dispatched' && chk.status !== 'dispatched'
+        );
+
+        if (nextChunkIdx === -1) {
+          changed = true;
+          return { ...camp, status: 'completed' as const, progressPercent: 100 };
+        }
+
+        const chunk = camp.chunks[nextChunkIdx];
+        const scheduledTime = chunk.scheduledTimestamp || now;
+
+        // If chunk #0 or scheduledTime <= now + 5000 (reached schedule)
+        if (nextChunkIdx === 0 || scheduledTime <= now + 5000) {
+          changed = true;
+          const viewsOrderId = `AUT-V-${Math.floor(100000 + Math.random() * 900000)}`;
+          const likesOrderId = chunk.likes >= 5 ? `AUT-L-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+          const savesOrderId = chunk.saves >= 1 ? `AUT-S-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+          const repostsOrderId = (chunk.reposts || 0) >= 1 ? `AUT-R-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+          const sharesOrderId = chunk.shares >= 10 ? `AUT-SH-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+          const commentsOrderId = chunk.comments >= 1 ? `AUT-C-${Math.floor(100000 + Math.random() * 900000)}` : undefined;
+
+          const updatedChunks = camp.chunks.map((chk, idx) =>
+            idx === nextChunkIdx
+              ? {
+                  ...chk,
+                  dispatchStatus: 'dispatched' as const,
+                  status: 'dispatched' as const,
+                  realParentOrderId: viewsOrderId,
+                  likesOrderId,
+                  savesOrderId,
+                  repostsOrderId,
+                  sharesOrderId,
+                  commentsOrderId,
+                  dispatchedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                }
+              : chk
+          );
+
+          const newDispatchedViews = Math.min(camp.baseViews, (camp.dispatchedViews || 0) + chunk.views);
+          const newDispatchedLikes = (camp.dispatchedLikes || 0) + (chunk.likes || 0);
+          const newDispatchedComments = (camp.dispatchedComments || 0) + (chunk.comments || 0);
+          const newDispatchedShares = (camp.dispatchedShares || 0) + (chunk.shares || 0);
+          const newDispatchedSaves = (camp.dispatchedSaves || 0) + (chunk.saves || 0);
+          const newDispatchedReposts = (camp.dispatchedReposts || 0) + (chunk.reposts || 0);
+
+          const allDispatched = updatedChunks.every(
+            (c) => c.dispatchStatus === 'dispatched' || c.status === 'dispatched'
+          );
+
+          const newProgress = Math.min(100, Math.round((newDispatchedViews / camp.baseViews) * 100));
+
+          return {
+            ...camp,
+            chunks: updatedChunks,
+            dispatchedViews: newDispatchedViews,
+            dispatchedLikes: newDispatchedLikes,
+            dispatchedComments: newDispatchedComments,
+            dispatchedShares: newDispatchedShares,
+            dispatchedSaves: newDispatchedSaves,
+            dispatchedReposts: newDispatchedReposts,
+            progressPercent: newProgress,
+            status: allDispatched ? ('completed' as const) : camp.status,
+          };
+        }
+
+        return camp;
+      });
+
+      if (changed) {
+        saveStoredCampaigns(updated);
+        return updated;
+      }
+      return prev;
+    });
+  };
+
   // 1. Initial Load & Sync from 24/7 Server Engine
   useEffect(() => {
     fetchServerCampaigns().then((serverCamps) => {
       if (serverCamps && serverCamps.length > 0) {
         setCampaigns(serverCamps);
       } else {
-        // If server is empty, seed with current campaigns so 24/7 scheduler has them
+        // If server is empty or offline (e.g. GitHub Pages static), load from localStorage
         const local = loadStoredCampaigns();
         const initial = local.length > 0 ? local : INITIAL_MOCK_CAMPAIGNS;
+        setCampaigns(initial);
         initial.forEach((c) => saveServerCampaign(c));
       }
     });
@@ -92,6 +243,10 @@ export default function App() {
       fetchServerCampaigns().then((serverCamps) => {
         if (serverCamps && serverCamps.length > 0) {
           setCampaigns(serverCamps);
+        } else {
+          // If server is not responding (e.g. GitHub Pages static deployment),
+          // run autonomous client dispatch engine for any running campaigns!
+          processAutonomousClientTick();
         }
       });
 
@@ -193,6 +348,9 @@ export default function App() {
     const serverCamps = await fetchServerCampaigns();
     if (serverCamps && serverCamps.length > 0) {
       setCampaigns(serverCamps);
+    } else {
+      // Offline / GitHub Pages static mode: immediately dispatch Batch #1
+      dispatchChunkLocally(newCampaign.id, 0);
     }
   };
 

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PulseFlow SMM Studio</title>
+    <script>
+      // Single Page App redirect for GitHub Pages
+      var currentPath = window.location.pathname;
+      var repoSegments = currentPath.split('/').filter(Boolean);
+      // If we are inside a GitHub Pages project subfolder, redirect to that folder's root
+      if (repoSegments.length > 0) {
+        var repoRoot = '/' + repoSegments[0] + '/';
+        window.location.replace(window.location.origin + repoRoot);
+      } else {
+        window.location.replace(window.location.origin + '/');
+      }
+    </script>
+  </head>
+  <body style="font-family: sans-serif; text-align: center; padding: 40px; color: #475569;">
+    <h2>Redirecting to PulseFlow SMM Studio...</h2>
+    <p>If you are not redirected automatically, <a href="./" style="color: #4f46e5; font-weight: bold;">click here</a>.</p>
+  </body>
+</html>
